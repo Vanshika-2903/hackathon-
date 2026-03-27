@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Activity, BrainCircuit, Watch } from 'lucide-react';
 
 export default function StatusWidget({ sessionData, setSessionData, theme, isDevMode, setAlert }) {
@@ -54,57 +54,77 @@ export default function StatusWidget({ sessionData, setSessionData, theme, isDev
           </span>
         </div>
 
-        {isDevMode ? (
-          <div className="flex flex-col gap-2">
-            <input
-              type="range"
-              min="0"
-              max="100"
-              value={sessionData.stressLevel}
-              onChange={(e) => {
-                const val = parseInt(e.target.value, 10);
-                let newState = 'idle';
+        <AnimatePresence mode="wait">
+          {state === 'flow' && !isDevMode ? (
+            <motion.div 
+              key="flow-msg"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="h-2 flex items-center justify-center"
+            >
+              <p className="text-[10px] md:text-xs font-black uppercase tracking-[0.3em] text-[#EF88AD] animate-pulse">
+                ✨ Transcendent Flow State — Keep Building. You've got this. ✨
+              </p>
+            </motion.div>
+          ) : isDevMode ? (
+            <motion.div key="dev-slider" className="flex flex-col gap-2">
+              <input
+                type="range"
+                min="0"
+                max="100"
+                value={sessionData.stressLevel}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  let newState = 'idle';
 
-                if (val >= 95) newState = 'meltdown';
-                else if (val >= 75) newState = 'crisis';
-                else if (val >= 50) newState = 'warning';
-                else if (val >= 30) newState = 'flow';
+                  if (val >= 95) newState = 'meltdown';
+                  else if (val >= 75) newState = 'crisis';
+                  else if (val >= 50) newState = 'warning';
+                  else if (val >= 30) newState = 'flow';
 
-                if (val >= 75 && sessionData.stressLevel < 75) {
-                  setAlert({ type: 'crisis', message: 'CRITICAL STRESS (TEST)' });
-                  setTimeout(() => setAlert(null), 3000);
-                }
+                  if (val >= 75 && sessionData.stressLevel < 75) {
+                    setAlert({ type: 'crisis', message: 'CRITICAL STRESS (TEST)' });
+                    setTimeout(() => setAlert(null), 3000);
+                  }
 
-                setSessionData((prev) => ({
-                  ...prev,
-                  stressLevel: val,
-                  state: newState
-                }));
-              }}
-              className="w-full accent-yellow-500 h-2 bg-white/10 rounded-full appearance-none cursor-pointer"
-            />
-            <div className="flex justify-between items-center px-1">
-              <span className="text-[10px] opacity-40 uppercase font-bold tracking-tighter">0%</span>
-              <button 
-                onClick={handleForceAI}
-                className="text-[10px] px-3 py-1 bg-red-500/20 hover:bg-red-500/40 border border-red-500/30 text-red-200 font-bold uppercase tracking-widest rounded-md transition-all"
-              >
-                Force AI Suggestion
-              </button>
-              <span className="text-[10px] opacity-40 uppercase font-bold tracking-tighter">100%</span>
-            </div>
-          </div>
-        ) : (
-          <div className="h-2 w-full rounded-full bg-white/5 overflow-hidden shrink-0 border border-white/5 relative">
-            <motion.div
-              className="h-full rounded-full"
-              style={{ backgroundColor: theme.accent, boxShadow: `0 0 15px ${theme.accent}` }}
-              initial={{ width: 0 }}
-              animate={{ width: `${Math.min(100, sessionData.stressLevel)}%` }}
-              transition={{ type: 'spring', bounce: 0, duration: 1.2 }}
-            />
-          </div>
-        )}
+                  setSessionData((prev) => ({
+                    ...prev,
+                    stressLevel: val,
+                    state: newState
+                  }));
+                }}
+                className="w-full accent-yellow-500 h-2 bg-white/10 rounded-full appearance-none cursor-pointer"
+              />
+              <div className="flex justify-between items-center px-1">
+                <span className="text-[10px] opacity-40 uppercase font-bold tracking-tighter">0%</span>
+                <button 
+                  onClick={handleForceAI}
+                  className="text-[10px] px-3 py-1 bg-red-500/20 hover:bg-red-500/40 border border-red-500/30 text-red-200 font-bold uppercase tracking-widest rounded-md transition-all"
+                >
+                  Force AI Suggestion
+                </button>
+                <span className="text-[10px] opacity-40 uppercase font-bold tracking-tighter">100%</span>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div 
+              key="stress-bar"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="h-2 w-full rounded-full bg-white/5 overflow-hidden shrink-0 border border-white/5 relative"
+            >
+              <motion.div
+                className="h-full rounded-full"
+                style={{ backgroundColor: theme.accent, boxShadow: `0 0 15px ${theme.accent}` }}
+                initial={{ width: 0 }}
+                animate={{ width: `${Math.min(100, sessionData.stressLevel)}%` }}
+                transition={{ type: 'spring', bounce: 0, duration: 1.2 }}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       <div className="flex items-center justify-between md:justify-end gap-6 w-full md:w-auto text-xs font-mono font-bold tracking-wider">
