@@ -1,0 +1,37 @@
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Global resets ── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background-color: #050103;
+  color: #f0e6ea;
+  font-family: 'DM Sans', sans-serif;
+  cursor: none;            /* hide default — replaced by custom cursor */
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Restore cursor on interactive elements so framer cursor overlaps correctly */
+a, button, [role="button"] { cursor: none; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #050103; }
+::-webkit-scrollbar-thumb { background: #670D2F; border-radius: 3px; }
+
+/* Selection */
+::selection { background: #A53860; color: #fff; }
+
+/* Utility — glass card */
+.glass {
+  background: rgba(58, 5, 25, 0.45);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
