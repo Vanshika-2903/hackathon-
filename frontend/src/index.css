@@ -1,0 +1,76 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+@theme {
+  --font-space: "Space Grotesk", sans-serif;
+  --font-inter: "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  --color-calm-bg: #0F0F0F;
+  --color-calm-panel: #232D3F;
+  --color-calm-accent: #005B41;
+  --color-calm-bright: #008170;
+
+  --color-warn-bg: #441752;
+  --color-warn-panel: #8174A0;
+  --color-warn-accent: #A888B5;
+  --color-warn-bright: #EFB6C8;
+
+  --color-crisis-bg: #3A0519;
+  --color-crisis-panel: #670D2F;
+  --color-crisis-accent: #A53860;
+  --color-crisis-bright: #EFB6AD;
+}
+
+:root {
+  /* Starting defaults for global transitions */
+  --tw-bg-color: #050103;
+  --tw-text-color: #FFFFFF;
+}
+
+::selection {
+  background: rgba(165, 56, 96, 0.45);
+  color: #FFFFFF;
+}
+
+/* Hide scrollbar while maintaining functionality */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+body {
+  background-color: var(--tw-bg-color);
+  color: var(--tw-text-color);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  transition: background-color 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-panel {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+  transition: background-color 1.5s cubic-bezier(0.4, 0, 0.2, 1), border-color 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
