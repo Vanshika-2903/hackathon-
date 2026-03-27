@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
  * Attaches MediaPipe Hands to an existing video element ref.
  * Returns derived stress signals from hand landmarks.
  */
-export default function useHandTracking(videoRef) {
+export default function useHandTracking(videoRef, threshold = 0.4) {
   const handsRef = useRef(null);
   const rafRef = useRef(null);
   const prevWristRef = useRef(null);
@@ -91,9 +91,9 @@ export default function useHandTracking(videoRef) {
           const variance = jitterWindowRef.current.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / jitterWindowRef.current.length;
           const jitterScore = Math.min(100, Math.round(variance * 100000));
 
-          // 4. Hand on Head Pose (Y < 0.35 for multiple landmarks usually means near top of frame/head)
+          // 4. Hand on Head Pose (normalized Y comparison)
           const avgY = landmarks.reduce((sum, lm) => sum + lm.y, 0) / landmarks.length;
-          const isHandNearHead = avgY < 0.4; 
+          const isHandNearHead = avgY < threshold; 
 
           setHandData({
             handsDetected: numHands,
@@ -130,7 +130,7 @@ export default function useHandTracking(videoRef) {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       if (handsInstance) handsInstance.close();
     };
-  }, [videoRef]);
+  }, [videoRef, threshold]);
 
   return handData;
 }

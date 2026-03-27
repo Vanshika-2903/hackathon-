@@ -1,9 +1,6 @@
 /**
  * In-Memory Session Store
  * Stores all session data using a Node.js Map.
- * Each session tracks: stress history, consecutive stress count,
- * bug history, last actions, developer memory (recurring mistakes),
- * dead zone timer, and calibration data.
  */
 
 const sessions = new Map();
@@ -19,28 +16,26 @@ function getSession(sessionId) {
       lastActivity: Date.now(),
 
       // Stress tracking
-      consecutiveHighStress: 0,   // Counts cycles where stress > threshold
-      stressHistory: [],           // Array of { timestamp, score, state }
-      currentState: 'idle',        // 'idle' | 'flow' | 'stressed' | 'dead_zone'
+      consecutiveHighStress: 0,
+      stressHistory: [],
+      currentState: 'idle',
+      currentStress: 0,
+      handPoseEMA: 0,
 
       // Adaptive threshold
-      calibrationSamples: [],      // First 15 samples used to calibrate baseline
+      calibrationSamples: [],
       isCalibrated: false,
-      adaptiveThreshold: 75,       // Default, updated after calibration
+      adaptiveThreshold: 75,
 
       // Dead zone tracking
       lastTypingTimestamp: Date.now(),
       deadZoneTriggered: false,
 
-      // Developer memory — tracks recurring mistake types
-      mistakeLog: {},              // { 'Type Mismatch': 3, 'Null Reference': 1 }
+      // Developer memory
+      mistakeLog: {},
       aiTriggerCount: 0,
-
-      // Bug history this session
-      bugHistory: [],              // Array of { timestamp, line, type, fixed }
-
-      // All AI suggestions this session
-      suggestionLog: [],           // Array of { timestamp, intent, suggestion, confidence }
+      bugHistory: [],
+      suggestionLog: [],
     });
   }
 
@@ -50,38 +45,143 @@ function getSession(sessionId) {
 }
 
 /**
- * Update session after telemetry is processed
+ * Centralized Stress Calculation Logic
  */
-function updateSessionStress(sessionId, { stressScore, state }) {
-  const session = getSession(sessionId);
-  session.stressHistory.push({ timestamp: Date.now(), score: stressScore, state });
-  session.currentState = state;
+function processTelemetry(sessionId, data) {
+  const {
+    mouseVelocity = 0,
+    clickRate = 0,
+    backspaceCount = 0,
+    faceStressScore = 0,
+    hasTyped = false,
+    handVelocity = 0,
+    fingerRatio = 1,
+    handJitter = 0,
+    isHandNearHead = false,
+  } = data;
 
-  // Keep history manageable (last 500 entries)
-  if (session.stressHistory.length > 500) {
-    session.stressHistory.shift();
+  const session = getSession(sessionId);
+
+  // Update activity
+  if (hasTyped) {
+    session.lastTypingTimestamp = Date.now();
+    session.deadZoneTriggered = false;
   }
 
+  const idleMs = Date.now() - session.lastTypingTimestamp;
+  const isDeadZone = idleMs > 60000 && faceStressScore > 40;
+
+  // Calibration
+  if (!session.isCalibrated) {
+    session.calibrationSamples.push(faceStressScore);
+    if (session.calibrationSamples.length >= 15) {
+      const avg = session.calibrationSamples.reduce((a, b) => a + b, 0) / session.calibrationSamples.length;
+      session.adaptiveThreshold = Math.min(85, Math.max(65, avg + 30));
+      session.isCalibrated = true;
+    }
+  }
+
+  // Normalization
+  const normalizedVelocity = Math.min(mouseVelocity, 5000) / 5000 * 100;
+  const normalizedClicks = Math.min(clickRate, 20) / 20 * 100;
+  const normalizedBackspaces = Math.min(backspaceCount, 30) / 30 * 100;
+  const normalizedFace = Math.min(faceStressScore, 100);
+  const normalizedHandVel = Math.min(handVelocity, 400) / 400 * 100;
+  const fistTension = (1 - Math.max(0, Math.min(1, fingerRatio))) * 100;
+  const normalizedJitter = Math.min(handJitter, 60) / 60 * 100;
+
+  // Weighting
+  const physical = (normalizedVelocity * 0.4) + (normalizedClicks * 0.8) +
+                   (normalizedBackspaces * 1.5) + (normalizedHandVel * 0.1) +
+                   (fistTension * 0.05) + (normalizedJitter * 0.5);
+
+  let instantaneousStress = Math.min(100, physical + (normalizedFace * 0.5));
+  if (isHandNearHead) instantaneousStress = Math.min(100, instantaneousStress + 40);
+
+  // Stickiness
+  const prevScore = session.currentStress || 0;
+  if (instantaneousStress > prevScore) {
+    session.currentStress = prevScore * 0.5 + instantaneousStress * 0.5;
+  } else {
+    session.currentStress = prevScore;
+  }
+
+  const stressScore = Math.round(session.currentStress);
+
+  // Unified States
+  let state = 'idle';
+  if (isDeadZone) {
+    state = 'dead_zone';
+  } else if (stressScore >= 95) {
+    state = 'meltdown';
+  } else if (stressScore >= 75) {
+    state = 'crisis';
+  } else if (stressScore >= 50) {
+    state = 'warning';
+  } else if (stressScore < 30 && hasTyped && backspaceCount < 3) {
+    state = 'flow';
+  }
+
+  // Trigger Logic
+  if (state === 'warning' || state === 'crisis' || state === 'meltdown') {
+    if (session.consecutiveHighStress >= 0) {
+      session.consecutiveHighStress += 1;
+    } else {
+      session.consecutiveHighStress += 1; // cooldown recovery
+    }
+  } else {
+    session.consecutiveHighStress = 0;
+  }
+
+  const shouldTriggerAI = (state === 'warning' || state === 'crisis' || state === 'meltdown' || data.isRageBackspacing) && session.consecutiveHighStress >= 1;
+  const shouldTriggerDeadZone = state === 'dead_zone' && !session.deadZoneTriggered;
+
+  if (shouldTriggerAI || data.isRageBackspacing) session.consecutiveHighStress = -8; // Longer cooldown after trigger to prevent spam
+  if (shouldTriggerDeadZone) session.deadZoneTriggered = true;
+
+  // Persist
+  session.stressHistory.push({ timestamp: Date.now(), score: stressScore, state });
+  session.currentState = state;
+  if (session.stressHistory.length > 500) session.stressHistory.shift();
+
+  return {
+    stressLevel: stressScore,
+    state,
+    shouldTriggerAI,
+    shouldTriggerDeadZone,
+    adaptiveThreshold: session.adaptiveThreshold,
+    isCalibrated: session.isCalibrated
+  };
+}
+
+/**
+ * Reset session stress
+ */
+function resetSession(sessionId) {
+  const session = getSession(sessionId);
+  session.currentStress = 0;
+  session.consecutiveHighStress = 0;
+  session.handPoseEMA = 0;
+  session.currentState = 'idle';
+  session.deadZoneTriggered = false;
+  session.stressHistory.push({ timestamp: Date.now(), score: 0, state: 'idle' });
   return session;
 }
 
 /**
- * Log an AI suggestion to session memory
+ * Log an AI suggestion
  */
 function logSuggestion(sessionId, { intent, suggestion, confidence, bugType }) {
   const session = getSession(sessionId);
-
   session.suggestionLog.push({ timestamp: Date.now(), intent, suggestion, confidence });
   session.aiTriggerCount += 1;
-
-  // Track recurring mistake types for developer memory
   if (bugType) {
     session.mistakeLog[bugType] = (session.mistakeLog[bugType] || 0) + 1;
   }
 }
 
 /**
- * Log a detected bug to session history
+ * Log a detected bug
  */
 function logBug(sessionId, bugs) {
   const session = getSession(sessionId);
@@ -91,7 +191,7 @@ function logBug(sessionId, bugs) {
 }
 
 /**
- * Get the top recurring mistake for developer memory hints
+ * Get top mistake
  */
 function getTopMistake(sessionId) {
   const session = getSession(sessionId);
@@ -101,7 +201,7 @@ function getTopMistake(sessionId) {
 }
 
 /**
- * Update the dead zone typing timestamp
+ * Update typing activity
  */
 function updateTypingActivity(sessionId) {
   const session = getSession(sessionId);
@@ -110,14 +210,14 @@ function updateTypingActivity(sessionId) {
 }
 
 /**
- * Get full session data for the report endpoint
+ * Get full session data
  */
 function getSessionReport(sessionId) {
   return sessions.get(sessionId) || null;
 }
 
 /**
- * Clean up sessions older than 2 hours (prevents memory leaks)
+ * Cleanup
  */
 function cleanupOldSessions() {
   const TWO_HOURS = 2 * 60 * 60 * 1000;
@@ -128,13 +228,12 @@ function cleanupOldSessions() {
     }
   }
 }
-
-// Run cleanup every 30 minutes
 setInterval(cleanupOldSessions, 30 * 60 * 1000);
 
 module.exports = {
   getSession,
-  updateSessionStress,
+  processTelemetry,
+  resetSession,
   logSuggestion,
   logBug,
   getTopMistake,

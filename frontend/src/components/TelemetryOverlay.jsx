@@ -9,13 +9,24 @@ import useHandTracking from '../hooks/useHandTracking.js';
  * Tracks mouse, keystrokes, facial expressions (face-api.js),
  * and now hand motion (MediaPipe Hands) — all emitted to backend.
  */
-export default function TelemetryOverlay({ socket, sessionId }) {
+export default function TelemetryOverlay({ socket, sessionId, isDevMode, language = 'javascript' }) {
   const videoRef = useRef(null);
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [debugData, setDebugData] = useState(null);
+  const [poseThreshold, setPoseThreshold] = useState(0.4);
+
+  useEffect(() => {
+    const stored = localStorage.getItem('flux_settings');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed.poseThreshold) setPoseThreshold(parsed.poseThreshold / 100);
+      } catch (e) {}
+    }
+  }, []);
 
   // Hand tracking hook — consumes same videoRef as face-api
-  const { handsDetected, handVelocity, fingerRatio, jitterScore, isHandNearHead } = useHandTracking(videoRef);
+  const { handsDetected, handVelocity, fingerRatio, jitterScore, isHandNearHead } = useHandTracking(videoRef, poseThreshold);
   const handDataRef = useRef({ handVelocity, fingerRatio, jitterScore, handsDetected, isHandNearHead });
 
   // Telemetry rolling window state
@@ -25,9 +36,57 @@ export default function TelemetryOverlay({ socket, sessionId }) {
     clicks: 0,
     keyPresses: 0,
     backspaces: 0,
+    rageBackspaceDetected: false,
     hasTyped: false,
     lastTick: Date.now()
   });
+
+  // Zen Mode Audio
+  const audioRef = useRef(null);
+  useEffect(() => {
+    // Note: Most browsers require user interaction before playing audio.
+    const audio = new Audio('https://www.soundjay.com/nature/ocean-waves-1.mp3');
+    audio.loop = true;
+    audio.volume = 0;
+    audioRef.current = audio;
+
+    return () => {
+      audio.pause();
+      audioRef.current = null;
+    };
+  }, []);
+
+  // Update Zen volume based on stress
+  useEffect(() => {
+    if (!audioRef.current) return;
+    const isHighStress = debugData?.state === 'crisis' || debugData?.state === 'meltdown';
+    
+    if (isHighStress) {
+      if (audioRef.current.paused) {
+        audioRef.current.play().catch(() => {});
+      }
+      // Fade in
+      let vol = audioRef.current.volume;
+      const fade = setInterval(() => {
+        vol = Math.min(0.3, vol + 0.05);
+        if (audioRef.current) audioRef.current.volume = vol;
+        if (vol >= 0.3) clearInterval(fade);
+      }, 200);
+      return () => clearInterval(fade);
+    } else {
+      // Fade out
+      let vol = audioRef.current.volume;
+      const fade = setInterval(() => {
+        vol = Math.max(0, vol - 0.05);
+        if (audioRef.current) audioRef.current.volume = vol;
+        if (vol <= 0) {
+          audioRef.current.pause();
+          clearInterval(fade);
+        }
+      }, 200);
+      return () => clearInterval(fade);
+    }
+  }, [debugData?.state]);
 
   // Sync hand data to ref for the emit loop to avoid re-triggering the interval
   useEffect(() => {
@@ -49,7 +108,19 @@ export default function TelemetryOverlay({ socket, sessionId }) {
       if (e.repeat) return;
       T.current.hasTyped = true;
       T.current.keyPresses++;
-      if (e.key === 'Backspace' || e.key === 'Delete') T.current.backspaces++;
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        T.current.backspaces++;
+        // RAGE DETECTION: If > 10 backspaces in 1 second
+        const now = Date.now();
+        if (!T.current.lastBackspaceTime) T.current.lastBackspaceTime = now;
+        if (now - T.current.lastBackspaceTime < 1000) {
+          T.current.backspaceBurst = (T.current.backspaceBurst || 0) + 1;
+          if (T.current.backspaceBurst > 10) T.current.rageBackspaceDetected = true;
+        } else {
+          T.current.backspaceBurst = 0;
+        }
+        T.current.lastBackspaceTime = now;
+      }
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -119,9 +190,11 @@ export default function TelemetryOverlay({ socket, sessionId }) {
 
       const payload = {
         sessionId,
+        language,
         mouseVelocity: velocity,
         clickRate: T.current.clicks,
         backspaceCount: T.current.backspaces,
+        isRageBackspacing: T.current.rageBackspaceDetected,
         faceStressScore,
         hasTyped: T.current.hasTyped,
         handVelocity: hData.handVelocity,
@@ -141,6 +214,7 @@ export default function TelemetryOverlay({ socket, sessionId }) {
         backspaces: T.current.backspaces,
         faceScore: Math.round(faceStressScore),
         expressions,
+        state: window.__lastState || 'idle',
         ...hData
       });
 
@@ -150,13 +224,14 @@ export default function TelemetryOverlay({ socket, sessionId }) {
         clicks: 0,
         keyPresses: 0,
         backspaces: 0,
+        rageBackspaceDetected: false,
         hasTyped: false,
         lastTick: Date.now()
       };
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [modelsLoaded, socket, sessionId]);
+  }, [language, modelsLoaded, socket, sessionId]);
 
   // Finger ratio label
   const fingerLabel = (ratio) => {
@@ -176,89 +251,91 @@ export default function TelemetryOverlay({ socket, sessionId }) {
         className="opacity-0 absolute pointer-events-none w-[640px] h-[480px]" 
       />
 
-      <motion.div 
-        drag 
-        dragConstraints={{ left: -window.innerWidth + 400, right: 0, top: -window.innerHeight + 500, bottom: 0 }}
-        dragMomentum={false}
-        whileDrag={{ cursor: 'grabbing', scale: 1.02, zIndex: 10000 }}
-        className="fixed bottom-6 right-6 z-[9999] flex flex-col items-end gap-3 pointer-events-auto cursor-grab"
-      >
-        <div className="glass-panel w-72 rounded-xl p-3 bg-[#0F0F0F]/95 backdrop-blur-3xl border border-white/10 shadow-2xl pointer-events-auto text-white">
-          <div className="flex items-center gap-2 mb-3 border-b border-white/10 pb-2 select-none">
-            <Activity className="text-green-400" size={16} />
-            <h3 className="font-bold text-sm tracking-wide">Telemetry Debug</h3>
-          </div>
-
-          <div className="relative rounded overflow-hidden bg-black aspect-video mb-3 border border-white/5 shadow-inner flex items-center justify-center">
-            {!modelsLoaded && <div className="text-xs text-white/50 absolute z-10">Loading models...</div>}
-            <VideoPreview videoRef={videoRef} />
-          </div>
-
-          <div className="grid grid-cols-2 gap-1.5 text-[11px]">
-            <div className="bg-white/5 p-2 rounded flex flex-col gap-1">
-              <div className="flex items-center gap-1 opacity-70">
-                <MousePointer2 size={12} /> <span>Mouse</span>
-              </div>
-              <span className="font-mono font-bold text-blue-400">{debugData?.velocity ?? 0} px/s</span>
+      {isDevMode && (
+        <motion.div 
+          drag 
+          dragConstraints={{ left: -window.innerWidth + 400, right: 0, top: -window.innerHeight + 500, bottom: 0 }}
+          dragMomentum={false}
+          whileDrag={{ cursor: 'grabbing', scale: 1.02, zIndex: 10000 }}
+          className="fixed bottom-6 right-6 z-[9999] flex flex-col items-end gap-3 pointer-events-auto cursor-grab"
+        >
+          <div className="glass-panel w-72 rounded-xl p-3 bg-[#0F0F0F]/95 backdrop-blur-3xl border border-white/10 shadow-2xl pointer-events-auto text-white">
+            <div className="flex items-center gap-2 mb-3 border-b border-white/10 pb-2 select-none">
+              <Activity className="text-green-400" size={16} />
+              <h3 className="font-bold text-sm tracking-wide">Telemetry Debug</h3>
             </div>
 
-            <div className="bg-white/5 p-2 rounded flex flex-col gap-1">
-              <div className="flex items-center gap-1 opacity-70">
-                <Keyboard size={12} /> <span>Input</span>
-              </div>
-              <span className="font-mono font-bold text-yellow-400">
-                {debugData ? `${debugData.keys}k ${debugData.backspaces}⌫` : '0k'}
-              </span>
+            <div className="relative rounded overflow-hidden bg-black aspect-video mb-3 border border-white/5 shadow-inner flex items-center justify-center">
+              {!modelsLoaded && <div className="text-xs text-white/50 absolute z-10">Loading models...</div>}
+              <VideoPreview videoRef={videoRef} />
             </div>
 
-            <div className="bg-white/5 p-2 rounded flex flex-col gap-1">
-              <div className="flex items-center gap-1 opacity-70">
-                <Hand size={12} /> <span>Hand Speed</span>
-              </div>
-              <span className="font-mono font-bold text-purple-400">
-                {debugData?.handsDetected > 0 ? `${debugData.handVelocity} px/s` : '–'}
-              </span>
-            </div>
-
-            <div className="bg-white/5 p-2 rounded flex flex-col gap-1">
-              <div className="flex items-center gap-1 opacity-70">
-                <Hand size={12} /> <span>Hand Pose</span>
-              </div>
-              <span className={`font-mono font-bold ${debugData?.isHandNearHead ? 'text-red-400' : 'text-orange-400'}`}>
-                {debugData?.handsDetected > 0 ? (debugData.isHandNearHead ? '🤯 Head Pose' : fingerLabel(debugData.fingerRatio)) : '–'}
-              </span>
-            </div>
-
-            <div className="bg-white/5 p-2 rounded flex flex-col gap-1 col-span-2">
-              <div className="flex items-center justify-between opacity-70 mb-1">
-                <div className="flex items-center gap-1">
-                  <Camera size={12} /> <span>Face Stress</span>
+            <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+              <div className="bg-white/5 p-2 rounded flex flex-col gap-1">
+                <div className="flex items-center gap-1 opacity-70">
+                  <MousePointer2 size={12} /> <span>Mouse</span>
                 </div>
-                {debugData?.handsDetected > 0 && (
-                  <span className="text-purple-400 text-[10px]">Jitter: {debugData.jitterScore}</span>
-                )}
+                <span className="font-mono font-bold text-blue-400">{debugData?.velocity ?? 0} px/s</span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="h-2 flex-1 bg-black rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 transition-all duration-500"
-                    style={{ width: `${Math.min(100, (debugData?.faceScore || 0) / 2)}%` }}
-                  />
+
+              <div className="bg-white/5 p-2 rounded flex flex-col gap-1">
+                <div className="flex items-center gap-1 opacity-70">
+                  <Keyboard size={12} /> <span>Input</span>
                 </div>
-                <span className="font-mono font-bold text-red-400 w-8 text-right">
-                  {debugData?.faceScore ?? 0}
+                <span className="font-mono font-bold text-yellow-400">
+                  {debugData ? `${debugData.keys}k ${debugData.backspaces}⌫` : '0k'}
                 </span>
               </div>
-              {debugData?.expressions && (
-                <div className="flex justify-between mt-1 opacity-60 text-[10px] uppercase font-bold text-white/80">
-                  <span>Anger: {Math.round(debugData.expressions.angry * 100)}%</span>
-                  <span>Sad: {Math.round(debugData.expressions.sad * 100)}%</span>
+
+              <div className="bg-white/5 p-2 rounded flex flex-col gap-1">
+                <div className="flex items-center gap-1 opacity-70">
+                  <Hand size={12} /> <span>Hand Speed</span>
                 </div>
-              )}
+                <span className="font-mono font-bold text-purple-400">
+                  {debugData?.handsDetected > 0 ? `${debugData.handVelocity} px/s` : '–'}
+                </span>
+              </div>
+
+              <div className="bg-white/5 p-2 rounded flex flex-col gap-1">
+                <div className="flex items-center gap-1 opacity-70">
+                  <Hand size={12} /> <span>Hand Pose</span>
+                </div>
+                <span className={`font-mono font-bold ${debugData?.isHandNearHead ? 'text-red-400' : 'text-orange-400'}`}>
+                  {debugData?.handsDetected > 0 ? (debugData.isHandNearHead ? '🤯 Head Pose' : fingerLabel(debugData.fingerRatio)) : '–'}
+                </span>
+              </div>
+
+              <div className="bg-white/5 p-2 rounded flex flex-col gap-1 col-span-2">
+                <div className="flex items-center justify-between opacity-70 mb-1">
+                  <div className="flex items-center gap-1">
+                    <Camera size={12} /> <span>Face Stress</span>
+                  </div>
+                  {debugData?.handsDetected > 0 && (
+                    <span className="text-purple-400 text-[10px]">Jitter: {debugData.jitterScore}</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="h-2 flex-1 bg-black rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 transition-all duration-500"
+                      style={{ width: `${Math.min(100, (debugData?.faceScore || 0) / 2)}%` }}
+                    />
+                  </div>
+                  <span className="font-mono font-bold text-red-400 w-8 text-right">
+                    {debugData?.faceScore ?? 0}
+                  </span>
+                </div>
+                {debugData?.expressions && (
+                  <div className="flex justify-between mt-1 opacity-60 text-[10px] uppercase font-bold text-white/80">
+                    <span>Anger: {Math.round(debugData.expressions.angry * 100)}%</span>
+                    <span>Sad: {Math.round(debugData.expressions.sad * 100)}%</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      </motion.div>
+        </motion.div>
+      )}
     </>
   );
 }

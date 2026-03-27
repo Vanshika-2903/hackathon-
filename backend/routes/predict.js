@@ -3,6 +3,10 @@ const router = express.Router();
 const { getSession, logSuggestion, getTopMistake } = require('../store/sessions');
 const { predictIntent } = require('../services/gemini');
 
+// Simple in-memory rate limiter to protect Gemini API quotas
+const rateLimits = {};
+const MIN_COOLDOWN_MS = 15000;
+
 /**
  * POST /api/predict-intent
  * Called when shouldTriggerAI or shouldTriggerDeadZone is true.
@@ -14,6 +18,11 @@ router.post('/', async (req, res) => {
     currentCode = '',
     lastActions = [],
     triggerReason = 'stress', // 'stress' | 'dead_zone'
+    language: requestedLanguage = '',
+    activeFile = null,
+    cursorOffset = null,
+    cursorPrefix = '',
+    cursorSuffix = '',
   } = req.body;
 
   if (!sessionId) {
@@ -22,7 +31,19 @@ router.post('/', async (req, res) => {
 
   const session = getSession(sessionId);
   const topMistake = getTopMistake(sessionId);
-  const language = session.language || 'javascript';
+  const language = requestedLanguage || session.language || 'javascript';
+  session.language = language;
+
+  // Enforce Rate Limit globally per session
+  const now = Date.now();
+  const lastRequestTime = rateLimits[sessionId] || 0;
+  if (now - lastRequestTime < MIN_COOLDOWN_MS) {
+    return res.status(429).json({ 
+      error: 'Rate limit exceeded.', 
+      details: 'Please wait 15 seconds before requesting another AI prediction.' 
+    });
+  }
+  rateLimits[sessionId] = now;
 
   // Enrich lastActions with trigger reason
   const enrichedActions = [
@@ -37,6 +58,10 @@ router.post('/', async (req, res) => {
       lastActions: enrichedActions,
       topMistake,
       language,
+      activeFile,
+      cursorOffset,
+      cursorPrefix,
+      cursorSuffix,
     });
 
     // Log to developer memory
@@ -54,9 +79,13 @@ router.post('/', async (req, res) => {
 
     return res.json({
       intent: result.intent,
+      inlineHint: result.inlineHint,
       suggestion: result.suggestion,
+      suggestedCode: result.suggestedCode || null,
       confidence: result.confidence,
       bugType: result.bugType || null,
+      activeFile,
+      cursorOffset,
       contextMessage,
       developerMemory: topMistake
         ? `You've hit "${topMistake.type}" ${topMistake.count} times this session.`

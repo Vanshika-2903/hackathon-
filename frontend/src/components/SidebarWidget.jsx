@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Files, Search, GitBranch, Terminal, ChevronDown, Check, Folder, FileJson, FileCode2, Plus } from 'lucide-react';
+import { Files, Search, GitBranch, Terminal, ChevronDown, Check, Folder, FileJson, FileCode2, Plus, X, Trash2 } from 'lucide-react';
 
-export default function SidebarWidget({ activeFile, setActiveFile, files = [], onCreateFile }) {
+export default function SidebarWidget({ activeFile, setActiveFile, files = [], onCreateFile, onDeleteFile }) {
   const [activeTab, setActiveTab] = useState('files');
   const [searchQuery, setSearchQuery] = useState('');
   const [commitMessage, setCommitMessage] = useState('');
@@ -10,10 +10,16 @@ export default function SidebarWidget({ activeFile, setActiveFile, files = [], o
     if (filename.endsWith('.js') || filename.endsWith('.jsx')) return <FileCode2 size={14} className="text-yellow-400" />;
     if (filename.endsWith('.ts') || filename.endsWith('.tsx')) return <FileCode2 size={14} className="text-blue-400" />;
     if (filename.endsWith('.json')) return <FileJson size={14} className="text-green-400" />;
-    if (filename.endsWith('.css')) return <Terminal size={14} className="text-blue-400" />;
-    if (filename.endsWith('.py')) return <Terminal size={14} className="text-blue-500" />;
-    if (filename.endsWith('.c') || filename.endsWith('.cpp') || filename.endsWith('.h')) return <Terminal size={14} className="text-purple-400" />;
+    if (filename.endsWith('.css')) return <Terminal size={14} className="text-sky-400" />;
+    if (filename.endsWith('.py')) return <FileCode2 size={14} className="text-blue-400" />;
+    if (filename.endsWith('.c') || filename.endsWith('.cpp') || filename.endsWith('.h') || filename.endsWith('.cc')) return <FileCode2 size={14} className="text-purple-400" />;
+    if (filename.endsWith('.java')) return <FileCode2 size={14} className="text-orange-400" />;
+    if (filename.endsWith('.go')) return <FileCode2 size={14} className="text-cyan-400" />;
+    if (filename.endsWith('.rs')) return <FileCode2 size={14} className="text-orange-300" />;
+    if (filename.endsWith('.rb')) return <FileCode2 size={14} className="text-red-400" />;
+    if (filename.endsWith('.sh')) return <Terminal size={14} className="text-green-400" />;
     if (filename.endsWith('.md')) return <Files size={14} className="text-slate-200" />;
+    if (filename.endsWith('.html') || filename.endsWith('.htm')) return <FileCode2 size={14} className="text-orange-500" />;
     return <Terminal size={14} className="text-slate-300" />;
   };
 
@@ -39,13 +45,22 @@ export default function SidebarWidget({ activeFile, setActiveFile, files = [], o
               <span className="font-semibold tracking-wide">src</span>
             </div>
             {files.filter(f => !f.name.includes('.test.')).map(f => (
-              <div 
+              <div
                 key={f.name}
                 onClick={() => setActiveFile(f.name)}
-                className={`flex items-center gap-2 py-1 px-2 pl-8 cursor-pointer transition-colors ${activeFile === f.name ? 'opacity-100 bg-blue-500/20 text-blue-200 border-l-2 border-blue-500' : 'opacity-80 hover:bg-white/5 border-l-2 border-transparent'}`}
+                className={`group flex items-center gap-2 py-1 px-2 pl-8 cursor-pointer transition-colors ${activeFile === f.name ? 'opacity-100 bg-blue-500/20 text-blue-200 border-l-2 border-blue-500' : 'opacity-80 hover:bg-white/5 border-l-2 border-transparent'}`}
               >
                 {getFileIcon(f.name)}
-                <span>{f.name}</span>
+                <span className="flex-1 truncate text-xs">{f.name}</span>
+                {onDeleteFile && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onDeleteFile(f.name); }}
+                    title={`Delete ${f.name}`}
+                    className="opacity-0 group-hover:opacity-60 hover:!opacity-100 p-0.5 rounded hover:bg-red-500/20 hover:text-red-400 transition-all shrink-0"
+                  >
+                    <X size={10} />
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -57,13 +72,22 @@ export default function SidebarWidget({ activeFile, setActiveFile, files = [], o
               <span className="font-semibold tracking-wide">tests</span>
             </div>
             {files.filter(f => f.name.includes('.test.')).map(f => (
-              <div 
+              <div
                 key={f.name}
                 onClick={() => setActiveFile(f.name)}
-                className={`flex items-center gap-2 py-1 px-2 pl-8 cursor-pointer transition-colors ${activeFile === f.name ? 'opacity-100 bg-blue-500/20 text-blue-200 border-l-2 border-blue-500' : 'opacity-80 hover:bg-white/5 border-l-2 border-transparent'}`}
+                className={`group flex items-center gap-2 py-1 px-2 pl-8 cursor-pointer transition-colors ${activeFile === f.name ? 'opacity-100 bg-blue-500/20 text-blue-200 border-l-2 border-blue-500' : 'opacity-80 hover:bg-white/5 border-l-2 border-transparent'}`}
               >
                 {getFileIcon(f.name)}
-                <span>{f.name}</span>
+                <span className="flex-1 truncate text-xs">{f.name}</span>
+                {onDeleteFile && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onDeleteFile(f.name); }}
+                    title={`Delete ${f.name}`}
+                    className="opacity-0 group-hover:opacity-60 hover:!opacity-100 p-0.5 rounded hover:bg-red-500/20 hover:text-red-400 transition-all shrink-0"
+                  >
+                    <X size={10} />
+                  </button>
+                )}
               </div>
             ))}
           </div>

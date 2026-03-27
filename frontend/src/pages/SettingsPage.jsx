@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Settings, ArrowLeft, Camera, Bell, Hand, ShieldCheck, RefreshCw } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Settings, ArrowLeft, Camera, Bell, Hand, ShieldCheck, RefreshCw, Smartphone, Monitor, Info } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import useHandTracking from '../hooks/useHandTracking';
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState({
@@ -13,6 +14,31 @@ export default function SettingsPage() {
   });
 
   const [saved, setSaved] = useState(false);
+  const [isCalibrating, setIsCalibrating] = useState(false);
+  const videoRef = useRef(null);
+
+  // Hook into the hand tracking with current threshold
+  const { isHandNearHead, handsDetected } = useHandTracking(videoRef, (settings.poseThreshold || 40) / 100);
+
+  useEffect(() => {
+    if (isCalibrating) {
+      if (navigator.mediaDevices?.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ video: true })
+          .then((stream) => {
+            if (videoRef.current) videoRef.current.srcObject = stream;
+          })
+          .catch(err => {
+            console.error("Webcam error:", err);
+            setIsCalibrating(false);
+          });
+      }
+    } else {
+      if (videoRef.current?.srcObject) {
+        videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+        videoRef.current.srcObject = null;
+      }
+    }
+  }, [isCalibrating]);
 
   useEffect(() => {
     const stored = localStorage.getItem('flux_settings');
@@ -131,6 +157,105 @@ export default function SettingsPage() {
                 unit="%"
                 onChange={(v) => handleSlider('sensitivity', v)}
               />
+            </div>
+          </div>
+
+          {/* New Calibration Section */}
+          <div className="lg:col-span-2 glass-panel p-8 rounded-3xl bg-[#3A0519]/10 border-white/5 space-y-8 overflow-hidden relative">
+            <h2 className="text-lg font-bold flex items-center gap-2 border-b border-white/5 pb-4 opacity-80">
+              <Hand size={20} className="text-[#EF88AD]"/> Sensor Calibration
+            </h2>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+              <div className="space-y-4 lg:col-span-1">
+                <p className="font-bold text-lg">Hand-on-Head Calibration</p>
+                <p className="text-sm text-white/40 leading-relaxed">
+                  Flux-State detects when you rest your head in your hands. Strike the pose while testing to find your ideal threshold.
+                </p>
+                <div className="flex flex-col gap-4 mt-6">
+                   <button 
+                    onClick={() => setIsCalibrating(!isCalibrating)}
+                    className={`px-6 py-4 rounded-2xl font-bold text-sm transition-all flex items-center justify-center gap-3 ${
+                      isCalibrating 
+                        ? 'bg-white/10 hover:bg-white/20 text-white' 
+                        : 'bg-[#A53860] hover:bg-[#A53860]/80 text-white shadow-[0_0_20px_rgba(165,56,96,0.3)]'
+                    }`}
+                   >
+                     {isCalibrating ? <RefreshCw size={18} className="animate-spin-slow" /> : <Hand size={18} />}
+                     {isCalibrating ? 'STOP TEST' : 'START POSÉ TEST'}
+                   </button>
+                   <div className="flex items-center gap-2 py-2 px-4 rounded-xl bg-white/5 border border-white/5">
+                      <div className={`w-2 h-2 rounded-full ${isCalibrating ? 'bg-green-500 animate-pulse' : 'bg-white/20'}`} />
+                      <span className="text-[10px] font-mono opacity-50 uppercase tracking-widest">
+                        {isCalibrating ? 'Sensor Active' : 'Sensor Hibernating'}
+                      </span>
+                   </div>
+                </div>
+              </div>
+
+              <div className="space-y-8 lg:col-span-2">
+                 <div className="relative group">
+                    <SliderRow 
+                        label="Pose Sensitivity" 
+                        desc="Y-Coordinate threshold for head-near-hand detection."
+                        val={settings.poseThreshold || 40}
+                        min={20}
+                        max={60}
+                        unit="%"
+                        onChange={(v) => handleSlider('poseThreshold', v)}
+                    />
+                    
+                    <AnimatePresence>
+                      {isCalibrating && (
+                        <motion.div 
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="mt-8 space-y-4"
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                             <span className="text-xs font-bold text-white/40 uppercase tracking-widest">Calibration Feed</span>
+                             {handsDetected > 0 ? (
+                               <span className="flex items-center gap-2 text-xs font-bold text-green-400 bg-green-400/10 px-3 py-1 rounded-full border border-green-400/20">
+                                 <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" /> HAND TRACKED
+                               </span>
+                             ) : (
+                               <span className="text-xs font-bold text-white/20 px-3 py-1 bg-white/5 rounded-full">NO HANDS DETECTED</span>
+                             )}
+                          </div>
+                          
+                          <div className="flex gap-4 items-end">
+                            <div className="relative w-48 aspect-video rounded-2xl overflow-hidden border border-white/10 bg-black shadow-2xl">
+                               <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover transform -scale-x-100" />
+                               <div className="absolute inset-x-0 top-0 h-[1px] bg-[#A53860]/50 shadow-[0_0_10px_rgba(165,56,96,1)]" style={{ top: `${settings.poseThreshold || 40}%` }} />
+                            </div>
+
+                            <motion.div 
+                              animate={{ 
+                                backgroundColor: isHandNearHead ? 'rgba(165, 56, 96, 0.4)' : 'rgba(255, 255, 255, 0.05)',
+                                borderColor: isHandNearHead ? 'rgba(165, 56, 96, 0.6)' : 'rgba(255, 255, 255, 0.1)',
+                                scale: isHandNearHead ? 1.05 : 1
+                              }}
+                              className="flex-1 h-24 rounded-2xl border flex flex-col items-center justify-center gap-2 transition-colors"
+                            >
+                              <p className={`text-xs font-bold tracking-widest uppercase ${isHandNearHead ? 'text-white' : 'text-white/20'}`}>
+                                {isHandNearHead ? '🤯 POSE DETECTED' : 'Awaiting Pose...'}
+                              </p>
+                              {isHandNearHead && (
+                                <motion.div 
+                                  initial={{ scale: 0 }}
+                                  animate={{ scale: 1 }}
+                                  className="text-[10px] bg-white text-[#A53860] px-2 py-0.5 rounded font-black"
+                                >
+                                  STRESS SIGNALED
+                                </motion.div>
+                              )}
+                            </motion.div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                 </div>
+              </div>
             </div>
           </div>
         </div>

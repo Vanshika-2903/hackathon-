@@ -11,6 +11,8 @@ import {
   Gauge,
   Eye,
 } from "lucide-react";
+import { FeatureCarousel } from "../components/ui/animated-feature-carousel";
+import HeroSection from "../components/HeroSection";
 
 /* ─────────────────────────────────────────
    CUSTOM CURSOR
@@ -125,64 +127,6 @@ function Navbar() {
         </Link>
       </div>
     </motion.nav>
-  );
-}
-
-/* ─────────────────────────────────────────
-   HERO
-───────────────────────────────────────── */
-function Hero() {
-  return (
-    <section
-      id="hero"
-      className="relative min-h-[95vh] flex flex-col items-center justify-start text-center px-6 pt-52 pb-20"
-    >
-      {/* Grid Pattern */}
-      <div className="absolute inset-0 z-0 opacity-[0.2]" 
-        style={{ backgroundImage: 'radial-gradient(circle, #EFB6AD 1px, transparent 1px)', backgroundSize: '80px 80px' }}
-      />
-      
-      {/* Atmosphere Glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[100vw] h-[60vh] bg-gradient-to-b from-[#EFB6AD]/10 to-transparent blur-[120px] pointer-events-none" />
-
-      <div className="relative z-10 max-w-6xl mx-auto">
-        <motion.div
-           initial={{ opacity: 0, scale: 0.95 }}
-           animate={{ opacity: 1, scale: 1 }}
-           transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
-        >
-          <p className="font-mono text-sm uppercase tracking-[0.4em] text-[#EFB6AD] mb-8 font-semibold">
-            The World's First Cognitive IDE
-          </p>
-          
-          <h1 className="font-space text-[clamp(3rem,9vw,6.5rem)] leading-[0.95] text-white font-bold tracking-[-0.04em] mb-10">
-            Code at the Speed <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-[#EFB6AD] to-white/40 animate-pulse">
-              Of Thought.
-            </span>
-          </h1>
-
-          <p className="font-inter text-xl md:text-3xl text-white/80 max-w-4xl mx-auto mb-12 leading-relaxed font-light">
-            Flux-State detects development friction before you do. We predict intent, dim distractions, and surface solutions when your focus wavers.
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-            <Link
-              to="/editor"
-              className="group relative px-10 py-4 rounded-full font-space font-bold text-black bg-[#EFB6AD] hover:scale-105 transition-all duration-500 shadow-[0_0_40px_rgba(239,182,173,0.2)] hover:shadow-[0_0_60px_rgba(239,182,173,0.4)]"
-            >
-              Start Coding Free
-            </Link>
-            <a
-              href="#how-it-works"
-              className="group font-inter text-base font-semibold text-white/60 hover:text-white transition-colors flex items-center gap-2"
-            >
-              See the telemetry engine <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-            </a>
-          </div>
-        </motion.div>
-      </div>
-    </section>
   );
 }
 
@@ -335,12 +279,28 @@ function Footer() {
 ───────────────────────────────────────── */
 export default function LandingPage() {
   return (
-    <div className="bg-[#050103] text-white selection:bg-[#EFB6AD]/30 selection:text-white no-scrollbar cursor-none min-h-screen overflow-x-hidden">
-      <CustomCursor />
+    <div className="bg-[#050103] text-white selection:bg-[#EFB6AD]/30 selection:text-white no-scrollbar min-h-screen overflow-x-hidden">
       <Navbar />
       <main>
-        <Hero />
+        <HeroSection />
         <HowItWorks />
+        
+        <section className="py-20 px-6">
+          <FadeUp>
+            <FeatureCarousel
+              image={{
+                alt: "Flux-State Core Features",
+                step1img1: "https://images.unsplash.com/photo-1618761714954-0b8cd0026356?q=80&w=1740&auto=format&fit=crop",
+                step1img2: "https://images.unsplash.com/photo-1607705703571-c5a8695f18f6?q=80&w=1740&auto=format&fit=crop",
+                step2img1: "https://images.unsplash.com/photo-1542393545-10f5cde2c810?q=80&w=1661&auto=format&fit=crop",
+                step2img2: "https://images.unsplash.com/photo-1504639725590-34d0984388bd?q=80&w=1674&auto=format&fit=crop",
+                step3img: "https://images.unsplash.com/photo-1587620962725-abab7fe55159?q=80&w=1740&auto=format&fit=crop",
+                step4img: "https://images.unsplash.com/photo-1498050108023-c5249f4df085?q=80&w=1742&auto=format&fit=crop",
+              }}
+            />
+          </FadeUp>
+        </section>
+
         <Features />
       </main>
       <Footer />

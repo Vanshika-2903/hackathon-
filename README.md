@@ -10,6 +10,9 @@ Development friction is invisible. We write code with 10% of our brain while bat
 ### Core Features:
 *   **Cognitive Telemetry Engine**: Tracks hand speed, pose, and facial expressions via webcam to calculate a real-time stress score.
 *   **Predictive AI Interventions**: When stress peaks or a long pause is detected, Flux-State's Gemini-powered brain predicts your intent and surfaces solutions *before* you search for them.
+*   **AI Stability & Precision**: 
+    *   **Contextual Anchoring**: Suggestions are strictly tied to the specific file and cursor position where they were generated, ensuring relevance during multi-file workflows.
+    *   **Intelligent Insertion**: "Smart-Merge" logic detects overlapping code to prevent duplicates, allowing for seamless one-click integration at the exact cursor offset.
 *   **Dynamic Theme Shifting**: The UI physically reacts to your state. It dims distractions in Flow State and alerts you with "Cognitive Pulses" during mental blocks.
 *   **Executive Dashboard**: A "Bento Box" UI that consolidates telemetry, terminal logs, and system status into a single, high-fidelity HUD.
 
@@ -47,6 +50,7 @@ Development friction is invisible. We write code with 10% of our brain while bat
     *   **Backend**: `cd backend && npm install`
 3.  **Environment Setup**:
     *   Create a `.env` in the `backend/` folder and add your `GEMINI_API_KEY`.
+    *   Optional: create `frontend/.env` and set `VITE_DEV_MODE=true` when you want the editor widgets and debug panels visible.
 4.  **Run Development Environment**:
     ```bash
     # From the root directory
