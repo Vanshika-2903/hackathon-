@@ -1,7 +1,10 @@
 require('dotenv').config({ override: true });
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { getMockResponse } = require('./mockAI');
 
-if (!process.env.GEMINI_API_KEY) {
+const IS_SIMULATION = process.env.SIMULATION_MODE === 'true';
+
+if (!process.env.GEMINI_API_KEY && !IS_SIMULATION) {
   console.warn('\n[WARN] GEMINI_API_KEY is missing from environment variables.');
   console.warn('AI features will be disabled. Set it in backend/.env to enable.\n');
 }
@@ -92,7 +95,7 @@ async function predictIntent({
   cursorPrefix = '',
   cursorSuffix = '',
 }) {
-  if (!model) {
+  if (!model && !IS_SIMULATION) {
     return {
       intent: "Gemini AI is not configured",
       inlineHint: "Set GEMINI_API_KEY to enable AI coaching.",
@@ -101,6 +104,11 @@ async function predictIntent({
       confidence: 0,
       bugType: ""
     };
+  }
+
+  if (IS_SIMULATION) {
+    console.log(`[SIMULATION] Returning mock response for predictIntent...`);
+    return getMockResponse({ currentCode, language, lastActions });
   }
 
   const memoryHint = topMistake
@@ -172,9 +180,14 @@ Respond ONLY with a valid JSON object (no markdown fences):
 
   console.log(`[Gemini] predictIntent: file=${totalLines} lines, strategy=${strategy}, prompt_size=~${Math.round(prompt.length/4)} tokens`);
 
-  const result = await model.generateContent(prompt);
-  const text = result.response.text();
-  return parseJSON(text);
+  try {
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+    return parseJSON(text);
+  } catch (err) {
+    console.error(`[Gemini API ERROR] Falling back to Simulation Mode: ${err.message}`);
+    return getMockResponse({ currentCode, language, lastActions });
+  }
 }
 
 /**
@@ -208,9 +221,34 @@ Respond ONLY with a valid JSON object (no markdown fences):
   ]
 }`;
 
-  const result = await model.generateContent(prompt);
-  const text = result.response.text();
-  return parseJSON(text);
+  if (!model && !IS_SIMULATION) {
+    return { hasBugs: false, bugs: [] };
+  }
+
+  if (IS_SIMULATION) {
+    return {
+      hasBugs: true,
+      bugs: [
+        {
+          line: 5,
+          type: "Code Quality",
+          description: "This looks like it could be optimized for performance.",
+          fix: "Consider using a memoized selector or a more efficient loop.",
+          severity: "warning",
+          confidence: 0.9
+        }
+      ]
+    };
+  }
+
+  try {
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+    return parseJSON(text);
+  } catch (err) {
+    console.warn(`[Gemini API ERROR] Fallback for checkBugs: ${err.message}`);
+    return { hasBugs: false, bugs: [] };
+  }
 }
 
 /**
@@ -234,9 +272,26 @@ Respond ONLY with a valid JSON object (no markdown fences):
   "confidence": 0.9
 }`;
 
-  const result = await model.generateContent(prompt);
-  const text = result.response.text();
-  return parseJSON(text);
+  if (!model && !IS_SIMULATION) {
+    return { answer: "AI Q&A is currently disabled.", confidence: 0 };
+  }
+
+  if (IS_SIMULATION) {
+    return {
+      answer: "Based on the provided context, you should ensure your component lifecycle matches your data fetching strategy. Try wrapping your logic in a dedicated service.",
+      codeExample: "export const dataService = { ... }",
+      confidence: 0.95
+    };
+  }
+
+  try {
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+    return parseJSON(text);
+  } catch (err) {
+    console.warn(`[Gemini API ERROR] Fallback for askQuestion: ${err.message}`);
+    return { answer: "I'm having trouble connecting to my brain right now. Try again in a second!", confidence: 0 };
+  }
 }
 
 module.exports = { predictIntent, checkBugs, askQuestion };

@@ -132,6 +132,9 @@ const BASE_COLORS = {
   'editorWidget.border': '#2a2a2a',
   'editorHoverWidget.background': '#161616',
   'editorHoverWidget.border': '#2a2a2a',
+  'scrollbarSlider.background': '#ffffff20',
+  'scrollbarSlider.hoverBackground': '#ffffff40',
+  'scrollbarSlider.activeBackground': '#ffffff60',
 };
 
 function ensureTheme(backgroundColor = '#1e1e1e') {
@@ -236,9 +239,9 @@ export default function EditorWidget({
       value: '',
       language: 'javascript',
       theme: THEME_NAME,
-      automaticLayout: false,
+      automaticLayout: true,
       minimap: { enabled: false },
-      scrollBeyondLastLine: false,
+      scrollBeyondLastLine: true,
       roundedSelection: false,
       fontFamily: 'JetBrains Mono, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
       fontSize: 15,
@@ -282,8 +285,11 @@ export default function EditorWidget({
       },
       tabCompletion: 'on',
       scrollbar: {
-        verticalScrollbarSize: 10,
-        horizontalScrollbarSize: 10,
+        verticalScrollbarSize: 12,
+        horizontalScrollbarSize: 12,
+        vertical: 'visible',
+        horizontal: 'auto',
+        useShadows: false,
       },
     });
 

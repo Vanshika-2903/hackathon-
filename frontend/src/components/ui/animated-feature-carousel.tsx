@@ -246,7 +246,7 @@ function FeatureCard({ children, step }: { children: React.ReactNode; step: numb
           <AnimatePresence mode="wait">
             <motion.div
               key={step}
-              className="flex w-full flex-col gap-4 md:w-3/5 p-10 relative z-20"
+              className="flex w-full flex-col gap-4 md:w-3/5 p-10 relative z-20 bg-gradient-to-r from-black/80 via-black/40 to-transparent backdrop-blur-[2px]"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
@@ -273,7 +273,7 @@ function FeatureCard({ children, step }: { children: React.ReactNode; step: numb
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.15, duration: 0.3, ease: [0.22, 1, 0.36, 1]}}
               >
-                <p className="text-base leading-relaxed text-white/60">
+                <p className="text-base leading-relaxed text-white/90">
                   {steps[step].description}
                 </p>
               </motion.div>

@@ -4,12 +4,18 @@ import { useEffect, useRef, useState } from 'react';
  * useHandTracking
  * Attaches MediaPipe Hands to an existing video element ref.
  * Returns derived stress signals from hand landmarks.
+ * @param {Object} options - Configuration including threshold and privacy settings.
  */
-export default function useHandTracking(videoRef, threshold = 0.4) {
+export default function useHandTracking(videoRef, threshold = 0.4, options = { isPrivacyFirst: true }) {
   const handsRef = useRef(null);
   const rafRef = useRef(null);
   const prevWristRef = useRef(null);
   const jitterWindowRef = useRef([]);
+
+  // ETHICAL AUDIT: Ensure no persistence of raw images
+  const dropFrame = () => {
+    // Explicitly nullify references if needed, though GC handles this for local 'image' var
+  };
 
   const [handData, setHandData] = useState({
     handsDetected: 0,

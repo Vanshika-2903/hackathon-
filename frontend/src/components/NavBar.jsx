@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Activity, Settings, Home, Code2 } from 'lucide-react';
+import { Activity, Settings, Home, Code2, ShieldCheck } from 'lucide-react';
 
 export default function NavBar() {
   const location = useLocation();
@@ -12,10 +12,17 @@ export default function NavBar() {
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4 border-b border-white/5 bg-[#0F0F0F]/60 backdrop-blur-xl flex justify-between items-center text-white">
-      <Link to="/" className="flex items-center gap-2 text-xl font-bold tracking-tight transition-transform hover:scale-105 active:scale-95">
-        <Activity className="text-[#008170]" size={24} />
-        <span>Flux<span className="text-transparent bg-clip-text bg-gradient-to-r from-[#008170] to-[#A888B5]">-State</span></span>
-      </Link>
+      <div className="flex items-center gap-6">
+        <Link to="/" className="flex items-center gap-2 text-xl font-bold tracking-tight transition-transform hover:scale-105 active:scale-95">
+          <Activity className="text-[#008170]" size={24} />
+          <span>Flux<span className="text-transparent bg-clip-text bg-gradient-to-r from-[#008170] to-[#A888B5]">-State</span></span>
+        </Link>
+        
+        <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-[#008170]/10 border border-[#008170]/20 text-[#008170] text-[10px] font-bold uppercase tracking-widest shadow-[0_0_15px_rgba(0,129,112,0.1)]">
+          <ShieldCheck size={12} />
+          <span>Zero-Knowledge Active</span>
+        </div>
+      </div>
 
       <div className="flex items-center gap-6">
         {navLinks.map((link) => {

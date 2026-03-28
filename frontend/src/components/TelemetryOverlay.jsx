@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import * as faceapi from 'face-api.js';
-import { Camera, MousePointer2, Keyboard, Activity, Hand } from 'lucide-react';
+import { Camera, MousePointer2, Keyboard, Activity, Hand, ShieldCheck, EyeOff, Eye, Info } from 'lucide-react';
 import useHandTracking from '../hooks/useHandTracking.js';
 
 /**
@@ -14,6 +14,7 @@ export default function TelemetryOverlay({ socket, sessionId, isDevMode, languag
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [debugData, setDebugData] = useState(null);
   const [poseThreshold, setPoseThreshold] = useState(0.4);
+  const [isPhantomMode, setIsPhantomMode] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem('flux_settings');
@@ -21,9 +22,21 @@ export default function TelemetryOverlay({ socket, sessionId, isDevMode, languag
       try {
         const parsed = JSON.parse(stored);
         if (parsed.poseThreshold) setPoseThreshold(parsed.poseThreshold / 100);
+        if (parsed.isPhantomMode) setIsPhantomMode(parsed.isPhantomMode);
       } catch (e) {}
     }
   }, []);
+
+  const togglePhantomMode = () => {
+    const next = !isPhantomMode;
+    setIsPhantomMode(next);
+    const stored = localStorage.getItem('flux_settings') || '{}';
+    try {
+      const parsed = JSON.parse(stored);
+      parsed.isPhantomMode = next;
+      localStorage.setItem('flux_settings', JSON.stringify(parsed));
+    } catch (e) {}
+  };
 
   // Hand tracking hook — consumes same videoRef as face-api
   const { handsDetected, handVelocity, fingerRatio, jitterScore, isHandNearHead } = useHandTracking(videoRef, poseThreshold);
@@ -267,7 +280,40 @@ export default function TelemetryOverlay({ socket, sessionId, isDevMode, languag
 
             <div className="relative rounded overflow-hidden bg-black aspect-video mb-3 border border-white/5 shadow-inner flex items-center justify-center">
               {!modelsLoaded && <div className="text-xs text-white/50 absolute z-10">Loading models...</div>}
-              <VideoPreview videoRef={videoRef} />
+              {isPhantomMode ? (
+                <div className="flex flex-col items-center gap-2 text-white/30">
+                  <motion.div
+                    animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.6, 0.3] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  >
+                    <ShieldCheck size={40} />
+                  </motion.div>
+                  <span className="text-[10px] font-mono uppercase tracking-widest">Phantom Logic Active</span>
+                </div>
+              ) : (
+                <VideoPreview videoRef={videoRef} />
+              )}
+              
+              <button 
+                onClick={togglePhantomMode}
+                className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/50 border border-white/10 hover:bg-white/10 transition-colors z-20 group"
+                title={isPhantomMode ? "Show Feed" : "Hide Feed (Phantom Mode)"}
+              >
+                {isPhantomMode ? <Eye size={14} className="text-white/60" /> : <EyeOff size={14} className="text-white/60" />}
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between mb-3 px-1">
+              <div className="flex items-center gap-1.5 text-[10px] font-bold text-green-400/80 uppercase tracking-tight">
+                <ShieldCheck size={12} />
+                <span>Local processing only</span>
+              </div>
+              <div className="group relative">
+                <Info size={12} className="text-white/20 cursor-help" />
+                <div className="absolute bottom-full right-0 mb-2 w-48 p-2 bg-black border border-white/10 rounded-lg text-[9px] leading-relaxed text-white/60 hidden group-hover:block z-[10001] shadow-2xl backdrop-blur-xl">
+                  Flux-State uses on-device inference. No video frames are ever sent to our servers.
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-1.5 text-[11px]">

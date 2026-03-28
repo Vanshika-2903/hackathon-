@@ -580,17 +580,6 @@ export default function BentoGrid({
               </span>
             </div>
 
-            {/* Inline AI Suggestion Panel */}
-            {sessionData.aiSuggestion && sessionData.aiSuggestion.activeFile === activeFile && (
-              <InlineSuggestionPanel
-                suggestion={sessionData.aiSuggestion}
-                activeFile={activeFile}
-                theme={theme}
-                onApply={handleApplySuggestion}
-                onDismiss={() => setSessionData(prev => ({ ...prev, aiSuggestion: null }))}
-              />
-            )}
-
             {/* Monaco Editor */}
             <div className="flex-1 relative min-h-0">
               <EditorWidget
@@ -601,6 +590,17 @@ export default function BentoGrid({
                 onAcceptSuggestion={() => setSessionData(prev => ({ ...prev, aiSuggestion: null }))}
                 theme={theme}
               />
+
+              {/* Inline AI Suggestion Panel (Floating) */}
+              {sessionData.aiSuggestion && sessionData.aiSuggestion.activeFile === activeFile && (
+                <InlineSuggestionPanel
+                  suggestion={sessionData.aiSuggestion}
+                  activeFile={activeFile}
+                  theme={theme}
+                  onApply={handleApplySuggestion}
+                  onDismiss={() => setSessionData(prev => ({ ...prev, aiSuggestion: null }))}
+                />
+              )}
             </div>
           </div>
 
