@@ -56,10 +56,10 @@ function getMockResponse(context) {
   const { currentCode = "", language = "javascript", lastActions = [] } = context;
   
   // Try to find a scenario that matches the code or triggered state
-  let match = SCENARIOS.find(s => 
-    currentCode.toLowerCase().includes(s.trigger.toLowerCase()) ||
-    lastActions.some(a => a.toLowerCase().includes(s.trigger.toLowerCase()))
-  );
+  let match = SCENARIOS.find(s => {
+    const regex = new RegExp(`\\b${s.trigger}\\b`, 'i');
+    return regex.test(currentCode) || (lastActions || []).some(a => regex.test(a));
+  });
 
   // Fallback to random if no match found
   if (!match) {
