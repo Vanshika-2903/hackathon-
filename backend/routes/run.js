@@ -20,11 +20,11 @@ const JDOODLE_API  = 'https://api.jdoodle.com/v1/execute';
 
 // Wandbox compiler IDs (from https://wandbox.org/api/list.json)
 const WANDBOX_MAP = {
-  python:     { compiler: 'cpython-head'       },
+  python:     { compiler: 'cpython-3.12.7'     },
   javascript: { compiler: 'nodejs-20.17.0'     },
   typescript: { compiler: 'typescript-5.6.2'   },
-  c:          { compiler: 'gcc-head-c'         },
-  cpp:        { compiler: 'gcc-head'           },
+  c:          { compiler: 'gcc-13.2.0-c'       },
+  cpp:        { compiler: 'gcc-13.2.0'         },
   java:       { compiler: 'openjdk-jdk-22+36'  },
   go:         { compiler: 'go-1.23.2'          },
   rust:       { compiler: 'rust-1.82.0'        },
@@ -75,7 +75,7 @@ router.post('/', async (req, res) => {
   // For multi-file workspaces, Wandbox accepts an `options` + `codes` array.
   const mainCode = files[0]?.content || '';
   const extraFiles = files.slice(1).map(f => ({
-    file: f.name || `file.txt`,
+    name: f.name || `file.txt`,
     code: f.content || '',
   }));
 
@@ -117,13 +117,10 @@ async function runWandbox(lang, code, extraFiles, stdin) {
     compiler,
     code,
     stdin,
+    files: extraFiles, // [{ name, code }] per latest Wandbox API
     'compiler-option-raw': '',
     'runtime-option-raw': '',
   };
-
-  if (extraFiles.length > 0) {
-    payload.codes = extraFiles; // { file, code }[]
-  }
 
   const response = await fetch(WANDBOX_API, {
     method: 'POST',
@@ -219,7 +216,7 @@ router.get('/runtimes', (req, res) => {
 });
 
 const DISPLAY_NAMES = {
-  python: 'Python 3', javascript: 'JavaScript (Node.js)',
+  python: 'Python 3.12', javascript: 'JavaScript (Node.js)',
   typescript: 'TypeScript', c: 'C (GCC)', cpp: 'C++ (GCC)',
   java: 'Java (OpenJDK)', go: 'Go', rust: 'Rust', ruby: 'Ruby', bash: 'Bash',
 };

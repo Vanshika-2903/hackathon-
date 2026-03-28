@@ -312,17 +312,23 @@ export default function BentoGrid({
       return;
     }
 
-    // Build the files array: active file first (entry point), then all others
-    const otherFiles = files.filter(f => f.name !== activeFile && RUNNABLE_LANGUAGES.has(getFileLanguage(f.name)));
-    const pistonFiles = [
+    // Build the files array: active file first (entry point), then all others of the SAME language/extension
+    const activeExt = activeFile.split('.').pop();
+    const otherFiles = files.filter(f => 
+      f.name !== activeFile && 
+      f.name.endsWith(`.${activeExt}`) &&
+      RUNNABLE_LANGUAGES.has(getFileLanguage(f.name))
+    );
+    
+    const bundleFiles = [
       { name: activeFile, content: activeFileObj.content },
       ...otherFiles.map(f => ({ name: f.name, content: f.content })),
     ];
 
-    if (pistonFiles.length > 1) {
+    if (bundleFiles.length > 1) {
       setTerminalLogs(prev => [
         ...prev,
-        { type: 'info', message: `> Including ${pistonFiles.length} file(s): ${pistonFiles.map(f => f.name).join(', ')}` },
+        { type: 'info', message: `> Including ${bundleFiles.length} supporting file(s): ${otherFiles.map(f => f.name).join(', ')}` },
       ]);
     }
 
@@ -332,7 +338,7 @@ export default function BentoGrid({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           language: execution.language,
-          files: pistonFiles,
+          files: bundleFiles,
         }),
       });
 
